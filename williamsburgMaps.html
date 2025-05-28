@@ -1,0 +1,825 @@
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Williamsburg, MA</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<link
+  href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css"
+  rel="stylesheet">
+
+<link 
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" 
+    rel="stylesheet">
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script> 
+    <script src="https://unpkg.com/@turf/turf@^7/turf.min.js"></script> 
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        #map {
+            width: 100%;
+            flex-shrink: 1;
+            height: 100%;
+        }
+
+       .mapboxgl-popup {
+            width: 175px;
+            font: 12px/20px 'Roboto', sans-serif;
+            background-color: #425A70;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 9999;
+            display: block;
+            padding: 0;
+            margin: 0;
+        }
+
+        .mapboxgl-popup .mapboxgl-popup-tip {
+            display: none;
+        }
+
+        .mapboxgl-popup-close-button {
+            top: 2px; 
+            right: 4px; 
+            width: 7px;
+            height: 7px;
+            color: #fff; 
+        }
+
+        .mapboxgl-popup-header {
+            margin: 0px;
+            font-size: 16px;
+            color: #fff;
+            font-weight: bold;
+            padding: 5px;
+        }
+    
+        .mapboxgl-popup-content {
+            font-size: 12px;
+            color: #425A70;
+            margin-left: 0px;
+            padding: 8px;
+            background-color: #fff;
+            line-height: 1.25;
+        }
+
+        #container  {
+           display: flex;
+           height: 100%;
+           width: 100%;
+           position: relative;
+        }
+
+        #layer-dropdown {
+            width: auto;
+            font-size: 16px;
+            padding: 8px;
+            margin: 10px 0;
+            z-index: 10;
+            background-color: #f2f0ef;
+            position: absolute;
+            top: 25px;
+            left: 30px;
+            font: 'Roboto', sans-serif;
+            font-size: 14px;
+            display: flex;
+            flex-shrink: 1;
+            border-radius: 4px;
+            opacity: 0.95;
+            border: #80808090;
+        }
+
+        #layer-controls {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            background: white;
+            padding: 10px;
+            font: 14px 'Roboto', sans-serif;
+            z-index: 2;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .legend {
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font: 14px/24px 'Roboto', sans-serif;
+            padding: 10px;
+            position: absolute;
+            right: 30px;
+            bottom: 50px;
+            width: 180px;
+            flex-shrink: 1;
+            text-wrap: balance;
+            z-index: 11;
+            line-height: 18px;
+        }
+ 
+        .legend h4 {
+            margin: 0 0 10px;
+            font: 'Roboto', sans-serif;
+        }
+ 
+        .legend div span {
+            display: inline-block;
+            height: 20px;
+            margin-right: 5px;
+            width: 20px;
+            background-color: white;
+            vertical-align: middle;
+            padding-bottom: 0;
+            text-wrap: nowrap;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+        <select id="layer-dropdown">
+            <option value="tracts-medIncome">Median Annual Household Income</option> 
+            <option value="tracts-pctCostBurdenedRenters">Percent of Renters, Cost Burdened</option> 
+            <option value="tracts-pctCostBurdenedOwners">Percent of Homeowners, Cost Burdened</option> 
+            <option value="tracts-pctHH">Percent Change in Households (2015-2023)</option>
+            <option value="zip-currentZHVI">Typical Home Price by Zip Code (2025)</option>
+            <option value="zip-chZHVI"> Change in Typical Home Price (2020-2025)</option>
+            <option value="tracts-layer">Massachusetts Tracts</option>
+        </select>
+        <div id="opacity-control" style="position: absolute; top: 75px; left: 30px; z-index: 10; background: #f2f0ef; padding: 8px; border-radius: 4px; font-family: Roboto, sans-serif; font-size: 14px;">
+            <label for="opacitySlider">Layer Opacity:</label>
+            <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="0.6">
+        </div>
+        <div id="basemap-toggle" style="position: absolute; top: 120px; left: 30px; z-index: 10; background: #f2f0ef; padding: 8px; border-radius: 4px; font-family: Roboto, sans-serif; font-size: 14px;">
+          <label for="basemapStyle">Basemap:</label>
+          <select id="basemapStyle">
+              <option value="gray">Gray</option>
+              <option value="satellite">Satellite</option>
+          </select>
+      </div>
+        <div id="medIncomeLegend" class="legend" style="display: block;">
+            <h4>Median Annual Household Income (2023, USD)</h4>
+            <div><span style="background-color: #980043"></span>$169,400 or more</div>
+            <div><span style="background-color: #dd1c77"></span></div>
+            <div><span style="background-color: #df65b0"></span></div>
+            <div><span style="background-color: #d7b5d8"></span></div>
+            <div><span style="background-color: #f1eef6"></span>$29,875 or less</div>
+            <div><span style="background-color: #425A7030"></span>No data</div>
+        </div>
+        <div id="cbRentersLegend" class="legend" style="display: none;">
+            <h4>Cost Burdened Renters (2023)</h4>
+            <div><span style="background-color: #016c59"></span>75%+</div>
+            <div><span style="background-color: #1c9099"></span></div>
+            <div><span style="background-color: #67a9cf"></span>50%</div>
+            <div><span style="background-color: #bdc9e1"></span></div>
+            <div><span style="background-color: #f6eff7"></span>0%</div>
+            <div><span style="background-color: #425A7030"></span>No data</div>
+        </div>
+        <div id="cbOwnersLegend" class="legend" style="display: none;">
+            <h4>Cost Burdened Homeowners (2023)</h4>
+            <div><span style="background-color: #810f7c"></span>35%+</div>
+            <div><span style="background-color: #8856a7"></span></div>
+            <div><span style="background-color: #8c96c6"></span>15%</div>
+            <div><span style="background-color: #b3cde3"></span></div>
+            <div><span style="background-color: #edf8fb"></span>0%</div>
+            <div><span style="background-color: #425A7030"></span>No data</div>
+        </div>
+        <div id="priceLegend" class="legend" style="display: none;">
+            <h4>Typical Massachusetts Home Price by Zip Code (2025)</h4> 
+            <div><span style="background-color: #045a8d"></span>$890,000 or more</div>
+            <div><span style="background-color: #2b8cbe"></span></div>
+            <div><span style="background-color: #74a9cf"></span></div>
+            <div><span style="background-color: #bdc9e1"></span></div>
+            <div><span style="background-color: #f1eef6"></span>$175,000 or less</div>
+            <div><span style="background-color: #425A7030"></span>No data</div>
+        </div>
+        <div id="chPriceLegend" class="legend" style="display: none;"> 
+            <h4> Change in Typical Massachusetts Home Price by Zip Code (2020-2025)</h4> 
+            <div><span style="background-color: #006837"></span>80% or more</div>
+            <div><span style="background-color: #31a354"></span></div>
+            <div><span style="background-color: #78c679"></span></div>
+            <div><span style="background-color: #c2e699"></span></div>
+            <div><span style="background-color: #ffffcc"></span>20% or less</div>
+            <div><span style="background-color: #425A7030"></span>No data</div>
+        </div>
+        <div id="pctHHLegend" class="legend" style="display: none;">
+            <h4>Percent Change in Households (2015-2023)</h4>
+            <div><span style="background-color: #1b7837"></span>50%+</div>
+            <div><span style="background-color: #7fbf7b"></span></div>
+            <div><span style="background-color: #d9f0d3"></span></div>
+            <div><span style="background-color: #f7f7f7"></span>0%</div>
+            <div><span style="background-color: #e7d4e8"></span></div>
+            <div><span style="background-color: #af8dc3"></span></div>
+            <div><span style="background-color: #762a83"></span>-15%+</div>
+            <div><span style="background-color: #425A7030"></span>No data</div>
+        </div>
+    <div id="map"></div>
+</div>
+
+<script>
+    const INITIAL_LOC = [-72.73, 42.39] 
+    const INITIAL_ZOOM = 11.5 //set initial zoom (zoom levels 9-12 best for cities depending on size)(this is set to 13 to accomodate the tileset that will need to be uploaded via CLI)
+    const communityScaleGray = "#425A70" //could replace with different accent color, I personally like this branding 
+    const placeOfInterest = "WILLIAMSBURG"
+    const medIncomePalette = [ //Sequential colorBrewer Purple/Red ramp
+                '#f1eef6',
+                '#d7b5d8',
+                '#df65b0',
+                '#dd1c77',
+                '#980043'
+            ]
+    const cbRentersPalette = [ //Sequential colorBrewer GrnBlu ramp
+                '#f6eff7',
+                '#bdc9e1',
+                '#67a9cf',
+                '#1c9099',
+                '#016c59'
+            ]
+    const cbOwnersPalette = [ //Sequential colorBrewer BluPur ramp
+                '#edf8fb',
+                '#b3cde3',
+                '#8c96c6',
+                '#8856a7',
+                '#810f7c'
+            ]
+    const hhChangePalette = [ //Diverging colorBrewer PurGre ramp
+                '#762a83',
+                '#af8dc3',
+                '#e7d4e8',
+                '#f7f7f7',
+                '#d9f0d3',
+                '#7fbf7b',
+                '#1b7837'
+            ]
+
+    const pricePalette = [
+                '#f1eef6',
+                '#bdc9e1',
+                '#74a9cf',
+                '#2b8cbe',
+                '#045a8d'
+            ]
+
+    const chPricePalette = [
+                '#ffffcc',
+                '#c2e699',
+                '#78c679',
+                '#31a354',
+                '#006837'
+            ]
+
+            
+
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZW10em90MDEiLCJhIjoiY20zZ2kyd3RpMDRnajJscHoyMG5neGJldyJ9.poXi4pgd2CoXKV2B4kg1Cw ';
+    let map;
+    const BASEMAP_STYLES = {
+      gray: 'mapbox://styles/emtzot01/cm6a8mjb5004g01qrd7cv07mq',
+      satellite: 'mapbox://styles/mapbox/satellite-streets-v12'
+    };
+
+    function initializeMap(styleKey = 'gray') {
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: BASEMAP_STYLES[styleKey],
+        center: INITIAL_LOC,
+        zoom: INITIAL_ZOOM
+      });
+
+
+    function adjustMapSize() {
+        const sidebarWidth = document.getElementById('sidebar').width;
+        const mapContainer = document.getElementById('map');
+  
+        mapContainer.style.marginLeft = `${sidebarWidth}px`;
+        map.resize(); 
+        }
+
+
+
+    map.on("load", () => {      
+        map.addSource("tracts", {    
+            type: "vector",
+            url: 'mapbox://emtzot01.axd1o6nw',
+            //data: "https://raw.githubusercontent.com/emtzot/mapSources/main/massachusetts_tracts.geojson",
+            promoteId: "GEOID"
+        })
+
+        map.addSource("zips", {
+            type: 'vector',
+            url: 'mapbox://emtzot01.963cu3b9',
+            promoteId: 'ZCTA5'
+        })
+   
+        map.addSource("towns", {    //replace with mass cities??
+            type: "vector",
+            url: "mapbox://emtzot01.4s34saee",
+            promoteId: "TOWN_ID"
+        })
+
+        map.addLayer({
+                id: "tracts-layer",  
+                type: "fill",
+                source: "tracts",
+                'source-layer': 'massachusetts_bgs-9lygw6',
+                paint: {
+                    'fill-color': communityScaleGray,
+                    "fill-opacity": 0.6,
+                    "fill-outline-color": "white",
+                    "fill-outline-width": 1,
+                    "fill-opacity": [
+                        "case",
+                        ["boolean", ["feature-state", "hover"], false],
+                        0.95,
+                        0.6
+                ]},
+                layout: {
+                    visibility: "none"
+                }
+            },"road-label", 
+            "settlement-major-label", 
+            "settlement-subdivision-label", 
+            "settlement-minor-label"
+        )
+
+        map.addLayer({
+            id: "tracts-medIncome",  
+            type: "fill",
+            source: "tracts",
+            'source-layer': 'massachusetts_bgs-9lygw6',
+            paint: {
+                "fill-color": [
+                    "case", ["==", ["get", "medIncome"], null], communityScaleGray,
+                    ["interpolate", 
+                    ["linear"],
+                    ["get", "medIncome"],
+                    29875,
+                    medIncomePalette[0], 
+                    59775,
+                    medIncomePalette[1],
+                    99625,
+                    medIncomePalette[2],
+                    139475,
+                    medIncomePalette[3],
+                    169400,
+                    medIncomePalette[4]]],
+                "fill-outline-color": "white",
+                "fill-opacity": [
+                    "case", ["==", ["get", "medIncome"], null], 0.3,
+                    ["case",
+                    ["boolean", ["feature-state", "hover"], false],
+                    0.95,
+                    0.6
+            ]]
+             },
+             layout: {
+                visibility: "visible"
+             }
+        },
+        "settlement-major-label", 
+        "settlement-subdivision-label", 
+        "settlement-minor-label"
+    ) 
+
+    map.addLayer({
+            id: 'zip-currentZHVI',
+            type: 'fill',
+            source: 'zips',
+            'source-layer': 'massachusetts_zips-4e09nn',
+            paint: {
+                "fill-color": [
+                    "case", ["==", ["get", "zhvi25"], null], communityScaleGray,
+                    ["interpolate", 
+                    ["linear"],
+                    ["get", "zhvi25"],
+                    175000,
+                    pricePalette[0], 
+                    383500,
+                    pricePalette[1],
+                    530000,
+                    pricePalette[2],
+                    735500,
+                    pricePalette[3],
+                    890000,
+                    pricePalette[4]]],
+                "fill-outline-color": "white",
+                "fill-opacity": [
+                    "case", ["==", ["get", "zhvi25"], null], 0.3,
+                    ["case",
+                    ["boolean", ["feature-state", "hover"], false],
+                    0.95,
+                    0.6
+            ]]
+             },
+             layout: {
+                visibility: "none"
+             }
+            
+    })
+
+
+    map.addLayer({
+            id: 'zip-chZHVI',
+            type: 'fill',
+            source: 'zips',
+            'source-layer': 'massachusetts_zips-4e09nn',
+            paint: {
+                "fill-color": [
+                    "case", ["==", ["get", "chZhvi"], null], communityScaleGray,
+                    ["interpolate", 
+                    ["linear"],
+                    ["get", "chZhvi"],
+                    0.21,
+                    chPricePalette[0], 
+                    0.43,
+                    chPricePalette[1],
+                    0.51,
+                    chPricePalette[2],
+                    0.58,
+                    chPricePalette[3],
+                    0.81,
+                    chPricePalette[4]]],
+                "fill-outline-color": "white",
+                "fill-opacity": [
+                    "case", ["==", ["get", "chZhvi"], null], 0.3,
+                    ["case",
+                    ["boolean", ["feature-state", "hover"], false],
+                    0.95,
+                    0.6
+            ]]
+             },
+             layout: {
+                visibility: "none"
+             }
+            
+    })
+
+    map.addLayer({      
+            id: "tracts-pctCostBurdenedRenters",  
+            type: "fill",
+            source: "tracts",
+            'source-layer': 'massachusetts_bgs-9lygw6',
+            paint: {
+                "fill-color": [
+                    "case", ["==", ["get", "pctRent30"], null], communityScaleGray,
+                    ["interpolate", 
+                    ["linear"],
+                    ["get", "pctRent30"],
+                    0,
+                    cbRentersPalette[0], 
+                    0.25,
+                    cbRentersPalette[1],
+                    0.50,
+                    cbRentersPalette[2],
+                    0.60,
+                    cbRentersPalette[3],
+                    0.75,
+                    cbRentersPalette[4]]],
+                "fill-outline-color": "white",
+                "fill-opacity": [
+                    "case", ["==", ["get", "pctRent30"], null], 0.3,
+                    ["case",
+                    ["boolean", ["feature-state", "hover"], false],
+                    0.95,
+                    0.6
+            ]]
+             },
+             layout: {
+                visibility: "none"
+             }
+        },
+        "settlement-major-label", 
+        "settlement-subdivision-label", 
+        "settlement-minor-label"
+    )
+    
+
+    map.addLayer({      
+            id: "tracts-pctCostBurdenedOwners",  
+            type: "fill",
+            source: "tracts",
+            'source-layer': 'massachusetts_bgs-9lygw6',
+            paint: {
+                "fill-color": [
+                    "case", ["==", ["get", "pctOwned30"], null], communityScaleGray,
+                    ["interpolate",
+                    ["linear"],
+                    ["get", "pctOwned30"],
+                    0,
+                    cbOwnersPalette[0],
+                    0.11,
+                    cbOwnersPalette[1], 
+                    0.15,
+                    cbOwnersPalette[2],
+                    0.22,
+                    cbOwnersPalette[3],
+                    0.35,
+                    cbOwnersPalette[4],
+                ]],
+                "fill-outline-color": "white",
+                "fill-opacity": [
+                    "case", ["==", ["get", "pctOwned30"], null], 0.3,
+                    ["case",
+                    ["boolean", ["feature-state", "hover"], false],
+                    0.95,
+                    0.6
+            ]]
+             },
+             layout: {
+                visibility: "none"
+             }
+        },
+        "settlement-major-label", 
+        "settlement-subdivision-label", 
+        "settlement-minor-label"
+    )
+
+
+    map.addLayer({     
+            id: "tracts-pctHH",  
+            type: "fill",
+            source: "tracts",
+            'source-layer': 'massachusetts_bgs-9lygw6',
+            paint: {
+                "fill-color": [
+                    "case", ["==", ["get", "pctChangeHH"], null], communityScaleGray,
+                    ["interpolate",
+                    ["linear"],
+                    ["get", "pctChangeHH"],
+                    -0.15,
+                    hhChangePalette[0],
+                    -0.07, 
+                    hhChangePalette[1],
+                    -0.01,
+                    hhChangePalette[2],
+                    0,
+                    hhChangePalette[3], 
+                    0.1,
+                    hhChangePalette[4],
+                    0.2,
+                    hhChangePalette[5],
+                    0.5,
+                    hhChangePalette[6]
+                ]],
+                "fill-outline-color": "white",
+                "fill-opacity": [
+                    "case", ["==", ["get", "pctChangeHH"], null], 0.3,
+                    ["case",
+                    ["boolean", ["feature-state", "hover"], false],
+                    0.95,
+                    0.6
+            ]]
+             },
+             layout: {
+                visibility: "none"
+        }},
+            "settlement-major-label", 
+            "settlement-subdivision-label", 
+            "settlement-minor-label"
+    )
+
+   
+
+    map.addLayer({
+            id: "town-layer",
+            type: "line",
+            source: "towns",
+            'source-layer': 'massachusetts_towns-a8k14v',
+            paint: {
+                "line-color": "#ffce0a",
+                "line-opacity": 0.8,
+                "line-width": 3
+                },
+            layout: {
+                visibility: "visible"
+                },
+            filter: ["==", "TOWN", placeOfInterest]}
+        );
+
+
+    //defaultView
+    adjustMapSize();
+    });
+
+    window.addEventListener('resize', adjustMapSize);
+     
+    map.on('click', (e) => {
+        const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
+            layers: ["tracts-medIncome"]
+        });
+
+        if (selectedGeo) {
+            const medianIncome = selectedGeo.properties.medIncome;
+            const displayIncome = medianIncome === null || medianIncome === undefined ? 'No available data' : `Annual median household income: $${medianIncome.toLocaleString()} (2023 USD)`;
+
+            new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
+            .setLngLat(selectedGeo.geometry.coordinates[0][0])
+            .setHTML(`
+                <div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
+                <div class="mapboxgl-popup-content">${displayIncome}
+                </div>
+            </div>`)
+            .addTo(map);
+    }});
+
+    map.on("click", (e)=> {
+        const [ selectedGeo ]= map.queryRenderedFeatures(e.point, {
+            layers: ["tracts-layer"]
+        });
+
+        if (selectedGeo) {
+            new mapboxgl.Popup({closeButton: true}, {clickToClose: true})
+            .setLngLat(selectedGeo.geometry.coordinates[0][0]) 
+            .setHTML(`<div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
+            </div>`)
+            .addTo(map)
+    }});
+
+    map.on('click', (e) => {
+        const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
+            layers: ["tracts-pctCostBurdenedRenters"]
+        });
+
+        if (selectedGeo) {
+            const pctRent30 = selectedGeo.properties.pctRent30;
+            const roundedPctRent30 = Math.round(pctRent30 * 1000) / 10
+            const displayPctRent30 = pctRent30 === null || pctRent30 === undefined ? 'No available data' : `${roundedPctRent30}% of renters in ${selectedGeo.properties.NAME} spend more than 30% of income on housing costs.`;
+
+            new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
+            .setLngLat(selectedGeo.geometry.coordinates[0][0])
+            .setHTML(`
+                <div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
+                <div class="mapboxgl-popup-content">${displayPctRent30}
+                </div>
+            </div>`)
+            .addTo(map);
+    }});
+
+    map.on('click', (e) => {
+        const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
+            layers: ["tracts-pctCostBurdenedOwners"]
+        });
+
+        if (selectedGeo) {
+            const pctOwned30 = selectedGeo.properties.pctOwned30;
+            const roundedPctOwned30 = Math.round(pctOwned30 * 1000) / 10
+            const displayPctOwned30 = pctOwned30 === null || pctOwned30 === undefined ? 'No available data' : `${roundedPctOwned30}% of homeowners in ${selectedGeo.properties.NAME} spend more than 30% of income on housing costs.`;
+
+            new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
+            .setLngLat(selectedGeo.geometry.coordinates[0][0])
+            .setHTML(`
+                <div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
+                <div class="mapboxgl-popup-content">${displayPctOwned30}
+                </div>
+            </div>`)
+            .addTo(map);
+    }});
+
+    map.on('click', (e) => {
+        const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
+            layers: ["tracts-pctHH"]
+        });
+
+        if (selectedGeo) {
+            const pctChangeHH = selectedGeo.properties.pctChangeHH;
+            const roundedPctChangeHH = Math.round(pctChangeHH * 1000) / 10
+            const displayPctChangeHH = pctChangeHH === null || pctChangeHH === undefined ? 'No available data' : `${selectedGeo.properties.NAME} saw a ${roundedPctChangeHH}% change in the number of households (2013-2023).`;
+
+            new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
+            .setLngLat(selectedGeo.geometry.coordinates[0][0])
+            .setHTML(`
+                <div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
+                <div class="mapboxgl-popup-content">${displayPctChangeHH}
+                </div>
+            </div>`)
+            .addTo(map);
+    }});
+
+
+    const dataLayers = [
+        'tracts-medIncome', 
+        'tracts-pctCostBurdenedRenters', 
+        'tracts-pctCostBurdenedOwners',
+        'tracts-pctHH',
+        'tracts-layer',
+        'zip-currentZHVI',
+        'zip-chZHVI'
+        ];
+
+
+    document.getElementById("opacitySlider").addEventListener("input", function (e) {
+        const newOpacity = parseFloat(e.target.value);
+        dataLayers.forEach(layerId => {
+        map.setPaintProperty(layerId, "fill-opacity", newOpacity);
+        });
+    });
+
+    const dropdown = document.getElementById('layer-dropdown');
+    dropdown.addEventListener('change', function() {
+        const selectedLayer = dropdown.value;
+        dataLayers.forEach(layerId => {
+            if (layerId !== selectedLayer && map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, 'visibility', 'none');
+        }
+    });
+        
+        map.setLayoutProperty(selectedLayer, 'visibility', 'visible');
+        map.setLayoutProperty("town-layer", 'visibility', 'visible');
+        map.setLayoutProperty("road-label", 'visibility', 'visible');
+        map.setLayoutProperty("settlement-major-label", 'visibility', 'visible');
+        map.setLayoutProperty("settlement-minor-label", 'visibility', 'visible');
+        map.setLayoutProperty("settlement-subdivision-label", 'visibility', 'visible');
+    });
+
+    document.getElementById('layer-dropdown').addEventListener('change', function() {
+        var legends = document.querySelectorAll('.legend');
+        legends.forEach(function(legend) {
+        legend.style.display = 'none';
+            });
+
+        var selectedLayer = dropdown.value;
+        if (selectedLayer === 'tracts-medIncome') {
+        document.getElementById('medIncomeLegend').style.display = 'block';
+        }   else if (selectedLayer === 'tracts-pctCostBurdenedRenters') {
+        document.getElementById('cbRentersLegend').style.display = 'block';
+        }   else if (selectedLayer === 'tracts-pctCostBurdenedOwners') {
+        document.getElementById('cbOwnersLegend').style.display = 'block';
+        }   else if (selectedLayer === 'zip-currentZHVI') {
+        document.getElementById('priceLegend').style.display = 'block';
+        }   else if (selectedLayer === 'zip-chZHVI') {
+        document.getElementById('chPriceLegend').style.display = 'block';
+        }   else if (selectedLayer === 'tracts-pctHH') {
+        document.getElementById('pctHHLegend').style.display = 'block';
+        }});
+
+
+    document.getElementById("basemapStyle").addEventListener("change", function (e) {
+    const newStyle = e.target.value;
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+        map.remove();
+        initializeMap(newStyle);
+        setTimeout(() => {
+            map.setCenter(center);
+            map.setZoom(zoom);
+        }, 500);
+    });
+
+        let hoveredGeoId = null;
+
+        const hoverLayers = [
+            { id: 'tracts-medIncome', source: 'tracts'},
+            { id: 'tracts-pctCostBurdenedRenters', source: 'tracts'},
+            { id: 'tracts-pctCostBurdenedOwners', source: 'tracts' },
+            { id: 'tracts-pctHH', source: 'tracts' },
+            { id: 'tracts-layer', source: 'tracts' }
+        ]       
+
+        hoverLayers.forEach(({ id, source }) => {
+            map.on('mousemove', id, (e) => {
+                if (e.features.length > 0) {
+                    if (hoveredGeoId !== null) {
+                        map.setFeatureState(
+                            { source, id: hoveredGeoId },
+                            { hover: false }
+                        );
+                    }
+                    hoveredGeoId = e.features[0].id;
+                    map.setFeatureState(
+                        { source, id: hoveredGeoId },
+                        { hover: true }
+                    );
+                }
+            });
+
+            map.on('mouseleave', id, () => {
+                if (hoveredGeoId !== null) {
+                    map.setFeatureState(
+                        { source, id: hoveredGeoId },
+                        { hover: false }
+                    );
+                }
+                hoveredGeoId = null;
+            });
+        })};
+
+        initializeMap();
+
+        </script>
+    </body>
+</html>
