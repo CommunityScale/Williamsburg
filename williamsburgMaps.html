@@ -615,7 +615,7 @@
 
         if (selectedGeo) {
             const medianIncome = selectedGeo.properties.medIncome;
-            const displayIncome = medianIncome === null || medianIncome === undefined ? 'No available data' : `Annual median household income: $${medianIncome.toLocaleString()} (2023 USD)`;
+            const displayIncome = medianIncome === null || medianIncome === undefined ? 'No available data' : `Annual median household income: $${medianIncome.toLocaleString('en-US')} (2023 USD)`;
 
             new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
             .setLngLat(selectedGeo.geometry.coordinates[0][0])
@@ -683,6 +683,49 @@
                 <div class="mapboxgl-popup-close-button">x</div>
                 <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
                 <div class="mapboxgl-popup-content">${displayPctOwned30}
+                </div>
+            </div>`)
+            .addTo(map);
+    }});
+
+    map.on('click', (e) => {
+        const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
+            layers: ["zip-currentZHVI"]
+        });
+
+        if (selectedGeo) {
+            const price = selectedGeo.properties.zhvi25;
+            const displayPrice = price === null || price === undefined ? 'No available data' : `The typical home price in this zip code, as of March 2025, is $${price.toLocaleString('en-US')}.`;
+
+            new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
+            .setLngLat(selectedGeo.geometry.coordinates[0][0])
+            .setHTML(`
+                <div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">Zip code ${selectedGeo.properties.ZCTA5}</div>
+                <div class="mapboxgl-popup-content">${displayPrice}
+                </div>
+            </div>`)
+            .addTo(map);
+    }});
+
+    map.on('click', (e) => {
+        const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
+            layers: ["zip-chZHVI"]
+        });
+
+        if (selectedGeo) {
+            const chPrice = selectedGeo.properties.chZhvi;
+            const roundedChPrice = Math.round(chPrice * 1000) / 10
+            const displayChPrice = roundedChPrice === null || roundedChPrice === undefined ? 'No available data' : `Between March 2020 and March 2025, this zip code saw a ${roundedChPrice}% increase in typical home price.`;
+
+            new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
+            .setLngLat(selectedGeo.geometry.coordinates[0][0])
+            .setHTML(`
+                <div class="mapboxgl-popup">
+                <div class="mapboxgl-popup-close-button">x</div>
+                <div class="mapboxgl-popup-header">Zip code ${selectedGeo.properties.ZCTA5}</div>
+                <div class="mapboxgl-popup-content">${displayChPrice}
                 </div>
             </div>`)
             .addTo(map);
