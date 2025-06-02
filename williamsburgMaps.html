@@ -147,7 +147,7 @@
             <option value="tracts-medIncome">Median Annual Household Income</option> 
             <option value="tracts-pctCostBurdenedRenters">Percent of Renters, Cost Burdened</option> 
             <option value="tracts-pctCostBurdenedOwners">Percent of Homeowners, Cost Burdened</option> 
-            <option value="tracts-pctHH">Percent Change in Households (2015-2023)</option>
+            <option value="ctysds-pctHH">Percent Change in Households (2015-2023)</option>
             <option value="zip-currentZHVI">Typical Home Price by Zip Code (2025)</option>
             <option value="zip-chZHVI"> Change in Typical Home Price (2020-2025)</option>
             <option value="tracts-layer">Massachusetts Tracts</option>
@@ -163,6 +163,10 @@
               <option value="satellite">Satellite</option>
           </select>
       </div>
+      <div id="layer-controls">
+        <label><input type="checkbox" class="layer-toggle" value="jobs-residentsWork">Where residents of Williamsburg, MA, work</label><br>
+        <label><input type="checkbox" class="layer-toggle" value="jobs-workersLive">Where workers in Williamsburg, MA, live</label>
+        </div>
         <div id="medIncomeLegend" class="legend" style="display: block;">
             <h4>Median Annual Household Income (2023, USD)</h4>
             <div><span style="background-color: #980043"></span>$169,400 or more</div>
@@ -306,7 +310,6 @@
         map.addSource("tracts", {    
             type: "vector",
             url: 'mapbox://emtzot01.axd1o6nw',
-            //data: "https://raw.githubusercontent.com/emtzot/mapSources/main/massachusetts_tracts.geojson",
             promoteId: "GEOID"
         })
 
@@ -316,10 +319,28 @@
             promoteId: 'ZCTA5'
         })
    
-        map.addSource("towns", {    //replace with mass cities??
+        map.addSource("towns", {    
             type: "vector",
             url: "mapbox://emtzot01.4s34saee",
             promoteId: "TOWN_ID"
+        })
+
+        map.addSource("ctysds", {
+            type: "vector",
+            url: "mapbox://emtzot01.7fsgy5ln",
+            promoteId: 'GEOID'
+        })
+
+        map.addSource("jobs-residents", {
+            type: 'geojson',
+            data: 'https://raw.githubusercontent.com/CommunityScale/Williamsburg/main/williamsburg_workLocs_2022.geojson',
+            promoteId: 'id'
+        })
+
+        map.addSource("jobs-workers", {
+            type: 'geojson',
+            data: 'https://raw.githubusercontent.com/CommunityScale/Williamsburg/main/williamsburg_resLocs_2022.geojson',
+            promoteId: 'id'
         })
 
         map.addLayer({
@@ -541,10 +562,10 @@
 
 
     map.addLayer({     
-            id: "tracts-pctHH",  
+            id: "ctysds-pctHH",  
             type: "fill",
-            source: "tracts",
-            'source-layer': 'massachusetts_bgs-9lygw6',
+            source: "ctysds",
+            'source-layer': 'massachusetts_ctysds-3vobtg',
             paint: {
                 "fill-color": [
                     "case", ["==", ["get", "pctChangeHH"], null], communityScaleGray,
@@ -583,7 +604,49 @@
             "settlement-minor-label"
     )
 
-   
+    map.addLayer ({
+            id: "jobs-residentsWork",
+            type: "circle",
+            source: "jobs-residents",
+            paint: {
+                "circle-color": "#83a5c2",
+                "circle-opacity": 0.7,
+                "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                    10,
+                    ["get", "jobs"], 
+                    13,
+                    ["*", ["get", "jobs"], 2]
+                ]
+            },
+            layout: {
+                visibility: "none"
+            }}
+        )
+        map.addLayer ({
+            id: "jobs-workersLive",
+            type: "circle",
+            source: "jobs-workers",
+            paint: {
+                "circle-color": '#7c9238',
+                "circle-opacity": 0.7,
+                "circle-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                    10,
+                    ["get", "jobs"], 
+                    13,
+                    ["*", ["get", "jobs"], 2]
+                ]
+            },
+            layout: {
+                visibility: "none"
+            }}
+        )
+    
 
     map.addLayer({
             id: "town-layer",
@@ -607,6 +670,21 @@
     });
 
     window.addEventListener('resize', adjustMapSize);
+
+    const checkboxes = document.querySelectorAll('.layer-toggle');
+
+    checkboxes.forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+        const layerId = checkbox.value;
+        const visibility = checkbox.checked ? 'visible' : 'none';
+        if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, 'visibility', visibility);
+            map.setLayoutProperty("town-layer", 'visibility', 'visible');
+            map.setLayoutProperty("road-label", 'visibility', 'visible');
+            map.setLayoutProperty("settlement-major-label", 'visibility', 'visible');
+            map.setLayoutProperty("settlement-subdivision-label", 'visibility', 'visible');
+            map.setLayoutProperty("settlement-minor-label", 'visibility', 'visible');;
+        }})})
      
     map.on('click', (e) => {
         const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
@@ -733,21 +811,23 @@
 
     map.on('click', (e) => {
         const [selectedGeo] = map.queryRenderedFeatures(e.point, {               
-            layers: ["tracts-pctHH"]
+            layers: ["ctysds-pctHH"]
         });
 
         if (selectedGeo) {
-            const pctChangeHH = selectedGeo.properties.pctChangeHH;
+            const pctChangeHH = selectedGeo.properties.pctChangeHH; //add hh count to 
             const roundedPctChangeHH = Math.round(pctChangeHH * 1000) / 10
-            const displayPctChangeHH = pctChangeHH === null || pctChangeHH === undefined ? 'No available data' : `${selectedGeo.properties.NAME} saw a ${roundedPctChangeHH}% change in the number of households (2013-2023).`;
+            const displayPctChangeHH = pctChangeHH === null || pctChangeHH === undefined ? 'No available data.' : `${selectedGeo.properties.BASENAME} saw a ${roundedPctChangeHH}% change in the number of households (2013-2023).`;
+            const displayCountHH23 = selectedGeo.properties.hh23 === null || selectedGeo.properties.hh23 === undefined ? 'No 2023 household data.' : `2023 household count: ${selectedGeo.properties.hh23}.`
+            const displayCountHH15 = selectedGeo.properties.hh15 === null || selectedGeo.properties.hh15 === undefined ? 'No 2015 household data.' : `2015 household count: ${selectedGeo.properties.hh15}.`
 
             new mapboxgl.Popup({ closeButton: true }, { clickToClose: true })
             .setLngLat(selectedGeo.geometry.coordinates[0][0])
             .setHTML(`
                 <div class="mapboxgl-popup">
                 <div class="mapboxgl-popup-close-button">x</div>
-                <div class="mapboxgl-popup-header">${selectedGeo.properties.NAME}</div>
-                <div class="mapboxgl-popup-content">${displayPctChangeHH}
+                <div class="mapboxgl-popup-header">${selectedGeo.properties.BASENAME}</div>
+                <div class="mapboxgl-popup-content">${displayPctChangeHH}<br>${displayCountHH15}<br>${displayCountHH23}
                 </div>
             </div>`)
             .addTo(map);
@@ -758,7 +838,7 @@
         'tracts-medIncome', 
         'tracts-pctCostBurdenedRenters', 
         'tracts-pctCostBurdenedOwners',
-        'tracts-pctHH',
+        'ctysds-pctHH',
         'tracts-layer',
         'zip-currentZHVI',
         'zip-chZHVI'
@@ -806,7 +886,7 @@
         document.getElementById('priceLegend').style.display = 'block';
         }   else if (selectedLayer === 'zip-chZHVI') {
         document.getElementById('chPriceLegend').style.display = 'block';
-        }   else if (selectedLayer === 'tracts-pctHH') {
+        }   else if (selectedLayer === 'ctysds-pctHH') {
         document.getElementById('pctHHLegend').style.display = 'block';
         }});
 
@@ -829,7 +909,9 @@
             { id: 'tracts-medIncome', source: 'tracts'},
             { id: 'tracts-pctCostBurdenedRenters', source: 'tracts'},
             { id: 'tracts-pctCostBurdenedOwners', source: 'tracts' },
-            { id: 'tracts-pctHH', source: 'tracts' },
+            { id: 'ctysds-pctHH', source: 'tracts' },
+            { id: 'zip-currentZHVI', source: 'zips' },
+            { id: 'zip-chZHVI', source: 'zips' },
             { id: 'tracts-layer', source: 'tracts' }
         ]       
 
